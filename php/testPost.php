@@ -11,10 +11,13 @@ $array["sensor_name"] = "lr01";
 $array["timestamp"] = $timestamp;
 
 // Connecting, selecting database
-$dbconn = pg_connect("host=localhost dbname=home user=rdcrla9s");
+$dbconn = pg_connect("host=itchyribs.com dbname=home user=arnsong password=mufasa22");
 
 // Insert values into database
 pg_insert($dbconn, 'temp_humidity', $array);
+
+echo $array["temperature"]."\r\n";
+echo $array["humidity"];
 
 // Closing connection
 pg_close($dbconn);

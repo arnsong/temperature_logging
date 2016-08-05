@@ -1,7 +1,7 @@
 <?php
 
 // Connecting, selecting database
-$dbconn = pg_connect("host=localhost dbname=home user=rdcrla9s");
+$dbconn = pg_connect("host=itchyribs.com port=5432 dbname=home user=arnsong") or die("connection failed");
 
 // Performing SQL query
 $query = 'SELECT timestamp, temperature FROM temp_humidity';
