@@ -1,0 +1,51 @@
+@import "../../less/bootstrap/bootstrap.less";
+
+@plot-color: red;;
+@font1: 16px Arial;
+@axis-line-width: 1;
+@plot-line-width: 2;
+@bg-color: black;
+
+.clip {
+    clip-path: url(#clip);
+}
+
+body { 
+     background-color: @bg-color;
+     font: @font1; }
+
+path { 
+    stroke: @plot-color;
+    stroke-width: @plot-line-width;
+    fill: none;
+    .clip;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: grey;
+    stroke-width: @axis-line-width;
+    shape-rendering: crispEdges;
+    .clip;
+}
+
+.axis { 
+    font: @font1;
+}
+
+.overlay {
+  fill: none;
+  pointer-events: all;
+}
+
+.focus circle {
+  fill: @plot-color;
+  stroke: @plot-color;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
