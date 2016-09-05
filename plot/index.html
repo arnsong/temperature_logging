@@ -37,109 +37,178 @@
 <script>
 
 // Defines attributes of svg element
-var svg = d3.select("svg"),
-margin = {top: 30, right: 50, bottom: 100, left: 50},
-margin2 = {top: 530, right: 50, bottom: 30, left: 50},
-width   = svg.attr("width") - margin.left - margin.right,
-height  = svg.attr("height") - margin.top - margin.bottom,
-height2 = svg.attr("height") - margin2.top - margin2.bottom;
+function parseTimeTemp(d) {
+    d.timestamp = parseDate(d.timestamp);
+    d.temperature = +d.temperature;
+}
+
+function parseTemp(d) {
+    return d.temperature;
+}
+
+function parseTime(d) {
+    return d.timestamp;
+}
+
+// Define the line
+function defineLineScale(axis) {
+
+    return d3.line().curve(d3.curveMonotoneX)
+	.x(function(d) { return axis.x(d.timestamp); })
+	.y(function(d) { return axis.y(d.temperature); });
+
+}
 
 // Parse the date / time
 var parseDate = d3.timeParse('%Y-%m-%d %H:%M:%S');
-var bisectDate = d3.bisector(function(d) { return d.timestamp; }).left,
-    formatValue = d3.format(".2f")
+var bisectDate = d3.bisector(parseTime).left
+var formatValue = d3.format(".2f")
 
-// Set the ranges
-var x  = d3.scaleTime().range([0, width]), 
-    x2 = d3.scaleTime().range([0, width]),
-    y  = d3.scaleLinear().range([height, 0]),
-    y2 = d3.scaleLinear().range([height2, 0]);
-
-
-// Define the axes
-var xAxis  = d3.axisBottom(x).ticks(5),
-    xAxis2 = d3.axisBottom(x2).ticks(5),
-    yAxis  = d3.axisLeft(y).ticks(5);
-
-var brush = d3.brushX(x2)
-    .extent([[0,0], [width, height2]])
-    .on("brush end", brushed);
-
-// Define the line
-var valueline = d3.line()
-    .curve(d3.curveMonotoneX)
-    .x(function(d) { return x(d.timestamp); })
-    .y(function(d) { return y(d.temperature); });
-
-// Define the line
-var valueline2 = d3.line()
-    .curve(d3.curveMonotoneX)
-    .x(function(d) { return x2(d.timestamp); })
-    .y(function(d) { return y2(d.temperature); });
+function createClipPath(svg, width, height) {
     
-svg.append("defs").append("clipPath")
-    .attr("id", "clip")
-    .append("rect")
-    .attr("width", width)
-    .attr("height", height);
+    svg.append("defs").append("clipPath")
+	.attr("id", "clip")
+	.append("rect")
+	.attr("width", width)
+	.attr("height", height);
 
-var focus = svg.append("g")
-    .attr("class", "focus")
-    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+}
 
-var context = svg.append("g")
-    .attr("class", "context")
-    .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+function createSvgGroup(svg, label, margin) {
+
+    return svg.append("g")
+	.attr("class", label)
+	.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+}
+
+
+// Brush
+function brushed() {
+
+    var s = d3.event.selection || focusAxis.x.range();
+    focusAxis.x.domain(s.map(contextAxis.x.invert, contextAxis.x));
+
+    focusAxis.container.select(".line").attr("d", focusAxis.valueline);
+    focusAxis.container.select(".x--axis").call(focusAxis.xAxis);
+
+}
+
+class Axis {
+
+    constructor(margin, label, num_xticks=5, num_yticks=5) {
+
+	this.svg = d3.select("svg");
+
+	this.height = this.svg.attr("height") - margin.top - margin.bottom;
+	this.width = this.svg.attr("width") - margin.left - margin.right;
+
+	this.x = d3.scaleTime().range([0, this.width]);
+	this.y = d3.scaleLinear().range([this.height, 0]);
+
+	this.xAxis = d3.axisBottom(this.x).ticks(num_xticks);
+	this.yAxis = d3.axisLeft(this.y).ticks(num_yticks);
+
+	createClipPath(this.svg, this.width, this.height);
+
+	this.container = createSvgGroup(this.svg, label, margin);
+	
+	this.bindTimeRange = function(data) {
+	    this.x.domain(d3.extent(data, parseTime));
+	}
+    
+	this.bindTempRange = function(data) {
+	    this.y.domain([d3.min(data, parseTemp), 
+			   d3.max(data, parseTemp)]);
+	}
+
+    }
+
+    bindData(data) {
+	
+	this.bindTimeRange(data);
+	this.bindTempRange(data);
+
+    }
+
+    addXAxis() {
+
+	// Add the X Axis
+	this.xAxisPlot = this.container.append("g")
+	    .attr("class", "axis x--axis")
+	    .attr("transform", "translate(0," + this.height + ")")
+	    .call(this.xAxis);
+
+    }
+
+    addYAxis() {
+    
+	// Add the Y Axis
+	this.yAxisPlot = this.container.append("g")
+	    .attr("class", "axis y--axis")
+	    .call(this.yAxis);
+    
+    }
+
+    plot(data) {
+
+	this.bindTimeRange(data);
+	this.bindTempRange(data);
+
+	// Add the X Axis
+	this.xAxisPlot = this.container.append("g")
+	    .attr("class", "axis x--axis")
+	    .attr("transform", "translate(0," + this.height + ")")
+	    .call(this.xAxis);
+
+	// Add the Y Axis
+	this.yAxisPlot = this.container.append("g")
+	    .attr("class", "axis y--axis")
+	    .call(this.yAxis);
+
+	this.valueline = defineLineScale(this);
+
+	// Add the valueline path.
+	this.container.append("path")
+	    .datum(data)
+	    .attr("class", "line")
+	    .attr("d", this.valueline);
+
+    }
+
+    addBrush() {
+
+	this.brush = d3.brushX()
+	    .extent([[0,0], [this.width, this.height]])
+	    .on("brush end", brushed);
+
+	this.container.append("g")
+	    .attr("class", "x brush")
+	    .call(this.brush);
+    
+    }
+
+}
+
+var margin  = {top:30, bottom:100, left:50, right:50};
+var margin2 = {top:530, bottom:30, left:50, right:50};
+
+var focusAxis = new Axis(margin);
+var contextAxis = new Axis(margin2);
 
 // Get the data
 d3.json("../php/data.php", function(error, data) {
 
-    data.forEach(function(d) {
-        d.timestamp = parseDate(d.timestamp);
-        d.temperature = +d.temperature;
-    });
+    data.forEach(parseTimeTemp);
 
     // Scale the range of the data
-    x.domain(d3.extent(data, function(d) { return d.timestamp; }));
-    y.domain([d3.min(data, function(d) { return d.temperature; }) - 2.0, 
-	      d3.max(data, function(d) { return d.temperature; }) + 2.0]);
+    focusAxis.plot(data);
 
-    x2.domain(x.domain());
-    y2.domain(y.domain());
-
-    // Add the valueline path.
-    focus.append("path")
-	.datum(data)
-        .attr("class", "line")
-        .attr("d", valueline);
-
-    // Add the X Axis
-    focus.append("g")
-        .attr("class", "axis x--axis")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xAxis);
-
-    // Add the Y Axis
-    focus.append("g")
-        .attr("class", "axis y--axis")
-        .call(yAxis);
-
-    // Add the valueline path.
-    context.append("path")
-	.datum(data)
-        .attr("class", "line")
-        .attr("d", valueline2);
-
-    context.append("g")
-	.attr("class", "axis x--axis")
-	.attr("transform", "translate(0," + height2 + ")")
-	.call(xAxis2);
-
-    context.append("g")
-	.attr("class", "x brush")
-	.call(brush);
+    contextAxis.plot(data);
+    contextAxis.addBrush();
     
-    var current = focus.append("g")
+    /*
+    var current = focusAxis.container.append("g")
 	.attr("class", "focus")
 	.style("display", "none");
 
@@ -150,38 +219,29 @@ d3.json("../php/data.php", function(error, data) {
 	.attr("x", 9)
 	.attr("dy", "-.35em");
 
-    svg.append("rect")
+    focusAxis.svg.append("rect")
 	.attr("class", "overlay")
-	.attr("width", width)
-	.attr("height", height)
+	.attr("width", focusAxis.width)
+	.attr("height", focusAxis.height)
 	.attr("transform", "translate(" + margin.left + "," + margin.top + ")")
 	.on("mouseover", function() { current.style("display", null); })
 	.on("mouseout", function() { current.style("display", "none"); })
 	.on("mousemove", mousemove);
-
+    
     function mousemove() {
-	var x0 = x.invert(d3.mouse(this)[0]),
+	var x0 = focusAxis.x.invert(d3.mouse(this)[0]),
             i = bisectDate(data, x0, 1),
             d0 = data[i - 1],
             d1 = data[i],
             d = x0 - d0.timestamp > d1.timestamp - x0 ? d1 : d0;
-	current.attr("transform", "translate(" + x(d.timestamp) + "," + y(d.temperature) + ")");
+	current.attr("transform", "translate(" + focusAxis.x(d.timestamp) + "," + focusAxis.y(d.temperature) + ")");
 	current.select("text").text(formatValue(d.temperature));
     }
 
+    */
 });
 
 
-function brushed() {
-//    if (!d3.event.selection) return;
-
-    var s = d3.event.selection || x.range();
-    x.domain(s.map(x2.invert, x2));
-
-    focus.select(".line").attr("d", valueline);
-    focus.select(".x--axis").call(xAxis);
-
-}
 
 </script>
 </body>
